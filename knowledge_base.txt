@@ -1,0 +1,37 @@
+=== EV CHARGING SESSIONS ===
+Peak charging hour is 11:00 with 2346 sessions.
+Second busiest hour is 12:00 with 2278 sessions.
+Quietest charging hour is 2:00 with 123 sessions.
+Average energy consumption per session is 30.44 kWh.
+Average session duration is 0.74 hours.
+Season with highest average energy demand is Winter at 31.29 kWh per session.
+Season with lowest average energy demand is Summer at 29.53 kWh per session.
+Most utilised charger ID is 5000194.0 with average utilisation rate of 3.79.
+Season with highest average carbon emissions is Autumn at 1353.93 gCO2 per session.
+Season with lowest average carbon emissions is Spring at 726.78 gCO2 per session.
+Spring produces 46.3% less carbon than Autumn.
+
+=== EV DRIVER BEHAVIOUR ===
+Most preferred charging time slot is 12am to 6am chosen by 45 drivers.
+Second most preferred charging time is 6pm to 12am chosen by 40 drivers.
+DC Charger is preferred by 98 out of 124 drivers.
+AC Charger is preferred by 26 out of 124 drivers.
+Average driver satisfaction score with public charging is 2.77 out of 5.
+79% of drivers prefer DC fast chargers over AC chargers.
+66% of drivers have experienced difficulty finding an available charging station.
+Most drivers are willing to wait a maximum of 10 to 20 minutes for an occupied charger.
+Most drivers travel between 10km and 30km per day.
+Most drivers charge their EV 1 to 2 times per week.
+
+=== NEWCASTLE CHARGING STATIONS ===
+Total number of charging stations in Newcastle is 198.
+Postcode with most charging stations is NE1 7RZ with 22 stations.
+Second highest postcode is NE1 4DP with 20 stations.
+Most common connector type is Type 2 Mennekes with 168 stations.
+Only 3 stations have CCS Type 2 Combo DC fast chargers.
+Only 4 stations have CHAdeMO DC fast chargers.
+36 stations are confirmed open 24 hours in Newcastle.
+Newcastle EV charging infrastructure is heavily concentrated in NE1 city centre postcodes.
+Outer residential postcodes NE5, NE6, NE7 have significantly fewer charging stations.
+Only 7 DC fast chargers exist across all 198 Newcastle stations.
+79% of drivers prefer DC fast charging but only 3.5% of stations provide it — a critical infrastructure gap.
