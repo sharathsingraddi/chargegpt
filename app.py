@@ -417,109 +417,272 @@ FOLLOW_UPS = {
 }
 
 # ============================================================
-# STREAMLIT UI
+# STREAMLIT UI — Professional Design
 # ============================================================
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+* {
+    font-family: 'Inter', -apple-system, sans-serif !important;
+}
+
+/* App background — clean dark */
 .stApp {
-    background: linear-gradient(135deg, #0a0a1a 0%, #0d1b2a 50%, #0a1628 100%);
+    background: #0b0f19;
 }
+
+/* Hide streamlit branding */
+#MainMenu, footer, header {
+    visibility: hidden;
+}
+
+/* Main container width */
+.block-container {
+    max-width: 780px !important;
+    padding-top: 2.5rem !important;
+}
+
+/* Title */
 h1 {
-    background: linear-gradient(90deg, #00d4ff, #7b2ff7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 2.8rem !important;
-    font-weight: 800 !important;
-    letter-spacing: -1px;
+    color: #ffffff !important;
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px !important;
+    margin-bottom: 0 !important;
 }
+
+/* Caption under title */
 .stApp [data-testid="stCaptionContainer"] p {
-    color: #8892a4 !important;
+    color: #64748b !important;
+    font-size: 0.92rem !important;
+    margin-top: 4px !important;
 }
+
+/* Chat messages — clean cards */
 .stChatMessage {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 16px !important;
-    padding: 12px 16px !important;
+    background: #111827 !important;
+    border: 1px solid #1e293b !important;
+    border-radius: 14px !important;
+    padding: 16px 20px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
 }
+
+/* User messages — subtle accent */
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: rgba(0, 212, 255, 0.08) !important;
-    border-color: rgba(0, 212, 255, 0.2) !important;
+    background: #0f1b2d !important;
+    border-color: #1e3a5f !important;
 }
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
-    background: rgba(123, 47, 247, 0.08) !important;
-    border-color: rgba(123, 47, 247, 0.2) !important;
+
+/* Message text */
+.stChatMessage p, .stChatMessage li {
+    color: #e2e8f0 !important;
+    font-size: 0.94rem !important;
+    line-height: 1.65 !important;
 }
+
+.stChatMessage strong {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* Chat input */
+.stChatInput {
+    padding-bottom: 1rem !important;
+}
+
 .stChatInput textarea {
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(0, 212, 255, 0.3) !important;
+    background: #111827 !important;
+    border: 1px solid #2d3b50 !important;
     border-radius: 12px !important;
-    color: white !important;
+    color: #f1f5f9 !important;
+    font-size: 0.94rem !important;
+    padding: 14px 18px !important;
 }
+
+.stChatInput textarea:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+.stChatInput textarea::placeholder {
+    color: #475569 !important;
+}
+
+/* Sidebar */
 [data-testid="stSidebar"] {
-    background: rgba(10, 15, 30, 0.95) !important;
-    border-right: 1px solid rgba(255,255,255,0.08) !important;
+    background: #0d1220 !important;
+    border-right: 1px solid #1e293b !important;
 }
-.stMarkdown p {
-    color: #c8d3e0 !important;
-    line-height: 1.7 !important;
+
+[data-testid="stSidebar"] .stMarkdown h3 {
+    color: #f1f5f9 !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.8px !important;
 }
+
+[data-testid="stSidebar"] .stMarkdown p {
+    color: #94a3b8 !important;
+    font-size: 0.85rem !important;
+}
+
+[data-testid="stSidebar"] hr {
+    border-color: #1e293b !important;
+    margin: 1.2rem 0 !important;
+}
+
+/* Selectbox */
+.stSelectbox > div > div {
+    background: #111827 !important;
+    border: 1px solid #2d3b50 !important;
+    border-radius: 10px !important;
+    color: #f1f5f9 !important;
+    font-size: 0.9rem !important;
+}
+
+.stSelectbox label {
+    color: #94a3b8 !important;
+    font-size: 0.85rem !important;
+}
+
+/* Follow-up buttons — pill style */
 .stButton button {
-    background: rgba(0, 212, 255, 0.08) !important;
-    border: 1px solid rgba(0, 212, 255, 0.25) !important;
-    border-radius: 20px !important;
-    color: #8fd8ff !important;
-    font-size: 0.8rem !important;
-    padding: 4px 14px !important;
+    background: transparent !important;
+    border: 1px solid #2d3b50 !important;
+    border-radius: 100px !important;
+    color: #94a3b8 !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    padding: 6px 14px !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+    width: 100% !important;
 }
+
 .stButton button:hover {
-    background: rgba(0, 212, 255, 0.18) !important;
-    border-color: rgba(0, 212, 255, 0.5) !important;
+    background: #1e3a5f !important;
+    border-color: #3b82f6 !important;
+    color: #ffffff !important;
+}
+
+/* Spinner */
+.stSpinner > div {
+    border-top-color: #3b82f6 !important;
+}
+
+/* Map container */
+[data-testid="stDeckGlJsonChart"] {
+    border-radius: 14px !important;
+    overflow: hidden !important;
+    border: 1px solid #1e293b !important;
+}
+
+/* Caption text in sidebar */
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    color: #64748b !important;
+    font-size: 0.8rem !important;
+    line-height: 1.5 !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #0b0f19;
+}
+::-webkit-scrollbar-thumb {
+    background: #2d3b50;
+    border-radius: 3px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ ChargeGPT")
-st.caption("Your AI-powered EV charging assistant for Newcastle — for drivers and city planners")
+# Header with badge
+col1, col2 = st.columns([0.8, 0.2])
+with col1:
+    st.title("⚡ ChargeGPT")
+    st.caption("AI-powered EV charging intelligence for Newcastle — grounded in real data")
+with col2:
+    st.markdown("""
+    <div style="text-align:right; padding-top:20px;">
+        <span style="background:#052e16; color:#4ade80; padding:5px 12px;
+        border-radius:100px; font-size:0.72rem; font-weight:600;
+        border:1px solid #14532d;">● LIVE</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### ⚙️ Settings")
+    st.markdown("""
+    <div style="padding:4px 0 12px 0;">
+        <span style="font-size:1.4rem; font-weight:700; color:#fff;">⚡ ChargeGPT</span><br>
+        <span style="font-size:0.75rem; color:#64748b;">v1.0 — Newcastle University</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### System Mode")
     mode = st.selectbox(
         "Response mode",
         ["Full ChargeGPT", "LLM + RAG only", "LLM only (baseline)"],
-        help="Full ChargeGPT uses real dataset analytics + RAG for maximum accuracy"
+        label_visibility="collapsed"
     )
 
-    st.markdown("---")
     if mode == "Full ChargeGPT":
-        st.markdown("🟢 **Full system active**")
-        st.caption("Analytics + RAG + Claude LLM")
+        st.markdown("""
+        <div style="background:#052e16; border:1px solid #14532d; border-radius:10px; padding:10px 14px; margin-top:8px;">
+            <span style="color:#4ade80; font-size:0.8rem; font-weight:600;">● Full system active</span><br>
+            <span style="color:#64748b; font-size:0.75rem;">Analytics engine + RAG + Claude LLM</span>
+        </div>
+        """, unsafe_allow_html=True)
     elif mode == "LLM + RAG only":
-        st.markdown("🟡 **RAG mode active**")
-        st.caption("Knowledge base + Claude LLM")
+        st.markdown("""
+        <div style="background:#2d2006; border:1px solid #713f12; border-radius:10px; padding:10px 14px; margin-top:8px;">
+            <span style="color:#facc15; font-size:0.8rem; font-weight:600;">● RAG mode active</span><br>
+            <span style="color:#64748b; font-size:0.75rem;">Knowledge base + Claude LLM</span>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown("🔴 **Baseline mode**")
-        st.caption("Claude LLM only. No data grounding.")
+        st.markdown("""
+        <div style="background:#2d0a0a; border:1px solid #7f1d1d; border-radius:10px; padding:10px 14px; margin-top:8px;">
+            <span style="color:#f87171; font-size:0.8rem; font-weight:600;">● Baseline mode</span><br>
+            <span style="color:#64748b; font-size:0.75rem;">No data grounding — may hallucinate</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### 📊 Data sources")
-    st.caption("• 29,775 verified charging sessions")
-    st.caption("• 124 NE England driver surveys")
-    st.caption("• 198 Newcastle charging stations")
-    st.caption("Last updated: July 2026")
+    st.markdown("### Data Sources")
+    st.markdown("""
+    <div style="font-size:0.82rem; color:#94a3b8; line-height:2;">
+    <span style="color:#3b82f6;">▸</span> 29,775 charging sessions<br>
+    <span style="color:#3b82f6;">▸</span> 124 EV driver surveys<br>
+    <span style="color:#3b82f6;">▸</span> 198 Newcastle stations
+    </div>
+    <div style="font-size:0.72rem; color:#475569; margin-top:6px;">All data verified · July 2026</div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### 💡 Try asking")
-    st.caption("🚗 Nearest charger to NE4 6PL?")
-    st.caption("📈 When's the busiest time to charge?")
-    st.caption("🏗️ Where should new stations be built?")
-    st.caption("🔌 Do drivers prefer fast chargers?")
+    st.markdown("### Quick Prompts")
+    st.markdown("""
+    <div style="font-size:0.8rem; color:#94a3b8; line-height:2.1;">
+    "Nearest charger to NE4 6PL"<br>
+    "When's the busiest time to charge?"<br>
+    "Where should new stations go?"<br>
+    "Do drivers prefer fast chargers?"
+    </div>
+    """, unsafe_allow_html=True)
 
 # Initialise state
 if "messages" not in st.session_state:
     st.session_state.messages = []
     st.session_state.messages.append({
         "role": "assistant",
-        "content": "Hey! I'm ChargeGPT ⚡ — your EV charging assistant for Newcastle. I can find your nearest charger, show demand patterns, and advise city planners on where to build next. All grounded in real data. What do you want to know?"
+        "content": "Hey! I'm **ChargeGPT** — your EV charging assistant for Newcastle.\n\nI can find your nearest charger, analyse demand patterns, and advise planners on where to build next. Everything I say is grounded in real data.\n\nWhat would you like to know?"
     })
 
 if "pending_question" not in st.session_state:
@@ -528,12 +691,12 @@ if "pending_question" not in st.session_state:
 if "last_intent" not in st.session_state:
     st.session_state.last_intent = "general"
 
-# Display conversation history
+# Display conversation
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Follow-up suggestion buttons
+# Follow-up buttons
 if len(st.session_state.messages) > 1:
     suggestions = FOLLOW_UPS.get(st.session_state.last_intent, FOLLOW_UPS["general"])
     cols = st.columns(len(suggestions))
@@ -543,10 +706,9 @@ if len(st.session_state.messages) > 1:
                 st.session_state.pending_question = suggestion
                 st.rerun()
 
-# Get user input
-user_input = st.chat_input("Ask me anything — try 'nearest charger to NE4 6PL'")
+# Input
+user_input = st.chat_input("Ask anything about EV charging in Newcastle...")
 
-# Handle either typed input or clicked follow-up
 question_to_process = None
 if user_input:
     question_to_process = user_input
@@ -560,11 +722,10 @@ if question_to_process:
     st.session_state.messages.append({"role": "user", "content": question_to_process})
 
     with st.chat_message("assistant"):
-        with st.spinner("Checking the data..."):
+        with st.spinner("Analysing real data..."):
             if mode == "Full ChargeGPT":
                 response, intent = answer(question_to_process)
                 st.session_state.last_intent = intent
-                # Add source label
                 response = response + "\n\n" + SOURCE_LABELS.get(intent, SOURCE_LABELS["general"])
             elif mode == "LLM + RAG only":
                 response = answer_rag_only(question_to_process)
@@ -574,7 +735,6 @@ if question_to_process:
                 intent = None
         st.markdown(response)
 
-        # Show map for station-related queries
         if intent in ["stations", "nearest", "planning"]:
             st.map(stations[["latitude", "longitude"]])
 
