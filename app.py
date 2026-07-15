@@ -131,12 +131,13 @@ def retrieve(question, n_results=3):
 def detect_intent(question):
     system_prompt = """You are a query classifier for an EV charging assistant.
 Classify the user's question into exactly ONE of these categories:
-- sessions: questions about charging sessions, peak hours, energy consumption, carbon emissions, utilisation rates, seasonal patterns
-- drivers: questions about driver behaviour, preferences, satisfaction scores, wait times, charging frequency, charger type preference
-- stations: questions about Newcastle charging stations, locations, postcodes, connector types, power output, 24 hour access
-- general: any other general question about EVs or charging
-Reply with ONLY the category name — one word, lowercase, no punctuation."""
+- sessions: anything about charging times, peak hours, energy, carbon, duration, utilisation, seasons, busiest times
+- drivers: anything about what drivers think, prefer, feel, satisfaction, waiting, how often they charge
+- stations: anything about charging stations in Newcastle, locations, postcodes, connectors, fast chargers
+- general: anything else about EVs or charging
 
+The question may be casual, slang, or informal — classify the intent not the wording.
+Reply with ONLY the category name — one word, lowercase, no punctuation."""
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=10,
@@ -186,11 +187,13 @@ def answer(question):
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=300,
-        system="""You are ChargeGPT, a data-grounded EV charging assistant for Newcastle.
-Answer questions using ONLY the analytics data and evidence provided.
-Always quote specific numbers from the data.
-Be clear, concise, and helpful.
-Never invent numbers not present in the provided data.""",
+        system="""You are ChargeGPT, a friendly and knowledgeable EV charging assistant for Newcastle.
+Answer in a conversational, natural tone — not robotic or formal.
+Use the analytics data and evidence provided to ground your answers in real numbers.
+If someone asks casually, respond casually but still give accurate data.
+Always include specific numbers from the data.
+Never invent numbers not present in the provided data.
+Keep answers concise — 3 to 5 sentences maximum.""",
         messages=[{
             "role": "user",
             "content": f"Analytics data:\n{analytics_result}\n\nEvidence:\n{rag_text}\n\nQuestion: {question}"
@@ -221,32 +224,151 @@ def answer_rag_only(question):
     return response.content[0].text
 
 # ============================================================
-# STREAMLIT UI
+# STREAMLIT UI — Premium Version
 # ============================================================
+
+st.markdown("""
+<style>
+/* Main background */
+.stApp {
+    background: linear-gradient(135deg, #0a0a1a 0%, #0d1b2a 50%, #0a1628 100%);
+}
+
+/* Title styling */
+h1 {
+    background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2.8rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -1px;
+}
+
+/* Caption */
+.stApp [data-testid="stCaptionContainer"] p {
+    color: #8892a4 !important;
+    font-size: 0.95rem !important;
+}
+
+/* Chat messages */
+.stChatMessage {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 16px !important;
+    padding: 12px 16px !important;
+    backdrop-filter: blur(10px);
+}
+
+/* User message */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    background: rgba(0, 212, 255, 0.08) !important;
+    border-color: rgba(0, 212, 255, 0.2) !important;
+}
+
+/* Assistant message */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+    background: rgba(123, 47, 247, 0.08) !important;
+    border-color: rgba(123, 47, 247, 0.2) !important;
+}
+
+/* Chat input */
+.stChatInput textarea {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(0, 212, 255, 0.3) !important;
+    border-radius: 12px !important;
+    color: white !important;
+    font-size: 0.95rem !important;
+}
+
+.stChatInput textarea:focus {
+    border-color: rgba(0, 212, 255, 0.7) !important;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.15) !important;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: rgba(10, 15, 30, 0.95) !important;
+    border-right: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* Selectbox */
+.stSelectbox > div > div {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 10px !important;
+    color: white !important;
+}
+
+/* Spinner */
+.stSpinner > div {
+    border-top-color: #00d4ff !important;
+}
+
+/* Markdown text */
+.stMarkdown p {
+    color: #c8d3e0 !important;
+    line-height: 1.7 !important;
+}
+
+/* Mode badge */
+.mode-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("⚡ ChargeGPT")
-st.caption("A data-grounded conversational AI assistant for EV charging infrastructure in Newcastle")
+st.caption("Your AI-powered EV charging assistant for Newcastle — ask anything, anytime")
 
 # Sidebar
 with st.sidebar:
-    st.header("Settings")
+    st.markdown("### ⚙️ Settings")
     mode = st.selectbox(
-        "Select mode",
+        "Response mode",
         ["Full ChargeGPT", "LLM + RAG only", "LLM only (baseline)"],
-        help="Choose which system configuration to use"
+        help="Full ChargeGPT uses real dataset analytics + RAG for maximum accuracy"
     )
+
     st.markdown("---")
-    st.markdown("**About ChargeGPT**")
-    st.markdown("Built on 3 real Newcastle datasets:")
-    st.markdown("- 29,775 charging sessions")
-    st.markdown("- 124 EV driver survey responses")
-    st.markdown("- 198 Newcastle charging stations")
+
+    # Mode explanation
+    if mode == "Full ChargeGPT":
+        st.markdown("🟢 **Full system active**")
+        st.caption("Analytics engine + RAG + Claude LLM. Most accurate.")
+    elif mode == "LLM + RAG only":
+        st.markdown("🟡 **RAG mode active**")
+        st.caption("Knowledge base retrieval + Claude LLM.")
+    else:
+        st.markdown("🔴 **Baseline mode**")
+        st.caption("Claude LLM only. No real data grounding.")
+
+    st.markdown("---")
+    st.markdown("### 📊 Data sources")
+    st.markdown("**Sessions dataset**")
+    st.caption("29,775 real charging sessions")
+    st.markdown("**Driver survey**")
+    st.caption("124 NE England EV drivers")
+    st.markdown("**Stations registry**")
+    st.caption("198 Newcastle charging stations")
+
+    st.markdown("---")
+    st.markdown("### 💡 Try asking")
+    st.caption("When's the busiest time to charge?")
+    st.caption("Do most drivers prefer fast chargers?")
+    st.caption("Which part of Newcastle has most chargers?")
+    st.caption("What season is cleanest for charging?")
 
 # Initialise conversation history
 if "messages" not in st.session_state:
     st.session_state.messages = []
     st.session_state.messages.append({
         "role": "assistant",
-        "content": "Hello! I am ChargeGPT, your EV charging assistant for Newcastle. Ask me anything about charging sessions, driver behaviour, or station infrastructure."
+        "content": "Hey! I'm ChargeGPT ⚡ — your EV charging assistant for Newcastle. I'm connected to real charging data so my answers are based on actual numbers, not guesses. What do you want to know?"
     })
 
 # Display conversation history
@@ -255,7 +377,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # Get user input
-user_input = st.chat_input("Ask me about EV charging in Newcastle...")
+user_input = st.chat_input("Ask me anything about EV charging in Newcastle...")
 
 if user_input:
     with st.chat_message("user"):
@@ -263,7 +385,7 @@ if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
-        with st.spinner("Analysing data..."):
+        with st.spinner("Checking the data..."):
             if mode == "Full ChargeGPT":
                 response = answer(user_input)
             elif mode == "LLM + RAG only":
