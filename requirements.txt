@@ -4,3 +4,5 @@ chromadb
 sentence-transformers
 pandas
 python-dotenv
+requests
+torchvision
