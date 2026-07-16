@@ -1,6 +1,6 @@
 # ============================================================
 # ChargeGPT — app.py
-# Complete version: memory + source labels + follow-ups
+# Clean UI + chat history + location search
 # ============================================================
 
 import os
@@ -12,18 +12,14 @@ import anthropic
 import chromadb
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
+from datetime import datetime
 
-st.set_page_config(
-    page_title="ChargeGPT",
-    page_icon="⚡",
-    layout="centered"
-)
+st.set_page_config(page_title="ChargeGPT", page_icon="⚡", layout="centered")
 
 # ============================================================
 # SETUP
 # ============================================================
 load_dotenv()
-
 try:
     api_key = st.secrets["ANTHROPIC_API_KEY"]
 except Exception:
@@ -44,28 +40,24 @@ def load_data():
 def setup_rag():
     with open("knowledge_base.txt", "r") as file:
         content = file.read()
-    all_lines = content.split("\n")
-    chunks = [line.strip() for line in all_lines
+    chunks = [line.strip() for line in content.split("\n")
               if line.strip() != "" and not line.startswith("===")]
     embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     chroma_client = chromadb.Client()
     collection = chroma_client.get_or_create_collection(name="chargegpt_knowledge")
-    collection.add(
-        documents=chunks,
-        ids=[f"chunk_{i}" for i in range(len(chunks))]
-    )
+    collection.add(documents=chunks, ids=[f"chunk_{i}" for i in range(len(chunks))])
     return collection
 
 usb, drivers, stations = load_data()
 collection = setup_rag()
 
 # ============================================================
-# ANALYTICS FUNCTIONS — Sessions
+# ANALYTICS FUNCTIONS
 # ============================================================
 def peak_hours(df):
-    result = df.groupby("hour").size().reset_index()
-    result.columns = ["hour", "session_count"]
-    return result.sort_values("session_count", ascending=False)
+    r = df.groupby("hour").size().reset_index()
+    r.columns = ["hour", "session_count"]
+    return r.sort_values("session_count", ascending=False)
 
 def avg_energy_per_session(df):
     return df["energy_consumption(kWh)"].mean()
@@ -74,56 +66,50 @@ def avg_duration(df):
     return df["duration_hrs"].mean()
 
 def seasonal_demand(df):
-    result = df.groupby("Season")["energy_consumption(kWh)"].mean().reset_index()
-    result.columns = ["season", "avg_energy"]
-    return result.sort_values("avg_energy", ascending=False)
+    r = df.groupby("Season")["energy_consumption(kWh)"].mean().reset_index()
+    r.columns = ["season", "avg_energy"]
+    return r.sort_values("avg_energy", ascending=False)
 
 def top_utilisation_chargers(df):
-    result = df.groupby("chargerId")["time_based_util_rate"].mean().reset_index()
-    result.columns = ["chargerId", "avg_utilisation"]
-    return result.sort_values("avg_utilisation", ascending=False)
+    r = df.groupby("chargerId")["time_based_util_rate"].mean().reset_index()
+    r.columns = ["chargerId", "avg_utilisation"]
+    return r.sort_values("avg_utilisation", ascending=False)
 
 def carbon_by_season(df):
-    result = df.groupby("Season")["Carbon_Emissions_(gCO2)"].mean().reset_index()
-    result.columns = ["season", "carbon_emissions"]
-    return result.sort_values("carbon_emissions", ascending=False)
+    r = df.groupby("Season")["Carbon_Emissions_(gCO2)"].mean().reset_index()
+    r.columns = ["season", "carbon_emissions"]
+    return r.sort_values("carbon_emissions", ascending=False)
 
-# ============================================================
-# ANALYTICS FUNCTIONS — Drivers
-# ============================================================
 def preferred_charge_time(df):
-    result = df.groupby("preferred_charge_time").size().reset_index()
-    result.columns = ["time_slot", "driver_count"]
-    return result.sort_values("driver_count", ascending=False)
+    r = df.groupby("preferred_charge_time").size().reset_index()
+    r.columns = ["time_slot", "driver_count"]
+    return r.sort_values("driver_count", ascending=False)
 
 def charger_preference(df):
-    result = df.groupby("ac_vs_dc_preference").size().reset_index()
-    result.columns = ["preference", "drivers_count"]
-    return result.sort_values("drivers_count", ascending=False)
+    r = df.groupby("ac_vs_dc_preference").size().reset_index()
+    r.columns = ["preference", "drivers_count"]
+    return r.sort_values("drivers_count", ascending=False)
 
 def avg_satisfaction(df):
     return df["satisfaction_score"].mean()
 
-# ============================================================
-# ANALYTICS FUNCTIONS — Stations
-# ============================================================
 def stations_by_postcode(df):
-    result = df.groupby("postcode").size().reset_index()
-    result.columns = ["postcode", "station_count"]
-    return result.sort_values("station_count", ascending=False)
+    r = df.groupby("postcode").size().reset_index()
+    r.columns = ["postcode", "station_count"]
+    return r.sort_values("station_count", ascending=False)
 
 def fast_charger_count(df):
-    result = df.groupby("connector1Type").size().reset_index()
-    result.columns = ["connector_type", "station_count"]
-    return result.sort_values("station_count", ascending=False)
+    r = df.groupby("connector1Type").size().reset_index()
+    r.columns = ["connector_type", "station_count"]
+    return r.sort_values("station_count", ascending=False)
 
 def chargers_open_24hr(df):
-    result = df.groupby("access24Hours").size().reset_index()
-    result.columns = ["access24Hours", "count"]
-    return result
+    r = df.groupby("access24Hours").size().reset_index()
+    r.columns = ["access24Hours", "count"]
+    return r
 
 # ============================================================
-# NEAREST STATION FINDER
+# LOCATION SEARCH — postcodes AND place names
 # ============================================================
 def postcode_to_coords(postcode):
     try:
@@ -132,6 +118,24 @@ def postcode_to_coords(postcode):
         data = response.json()
         if data["status"] == 200:
             return data["result"]["latitude"], data["result"]["longitude"]
+        return None, None
+    except Exception:
+        return None, None
+
+def placename_to_coords(place):
+    """Convert a place name like 'Primark Newcastle' to coordinates using OpenStreetMap Nominatim (free)"""
+    try:
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            "q": f"{place}, Newcastle upon Tyne, UK",
+            "format": "json",
+            "limit": 1
+        }
+        headers = {"User-Agent": "ChargeGPT-Dissertation-Project"}
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        data = response.json()
+        if data:
+            return float(data[0]["lat"]), float(data[0]["lon"])
         return None, None
     except Exception:
         return None, None
@@ -145,18 +149,13 @@ def haversine_distance(lat1, lon1, lat2, lon2):
          math.sin(dlon/2)**2)
     return R * 2 * math.asin(math.sqrt(a))
 
-def find_nearest_stations(postcode, n=3):
-    lat, lon = postcode_to_coords(postcode)
-    if lat is None:
-        return None
-
+def find_nearest_stations(lat, lon, n=3):
     df = stations.copy()
     df["distance_km"] = df.apply(
         lambda row: haversine_distance(lat, lon, row["latitude"], row["longitude"]),
         axis=1
     )
     nearest = df.sort_values("distance_km").head(n)
-
     results = []
     for _, row in nearest.iterrows():
         results.append(f"""
@@ -172,105 +171,87 @@ Status: {row['chargeDeviceStatus']}
 """)
     return "\n".join(results)
 
+def extract_location(question):
+    """Extract postcode OR place name from question using Claude"""
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=30,
+        system="""Extract the location from the message. It could be a UK postcode (like NE4 6PL) or a place name (like Primark, Eldon Square, St James Park).
+If it is a postcode reply: POSTCODE|<the postcode>
+If it is a place name reply: PLACE|<the place name>
+If no location found reply: NONE""",
+        messages=[{"role": "user", "content": question}]
+    )
+    result = response.content[0].text.strip()
+    if result == "NONE":
+        return None, None
+    parts = result.split("|")
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return None, None
+
 # ============================================================
 # INFRASTRUCTURE GAP ANALYSIS
 # ============================================================
 def infrastructure_gap_analysis():
     station_counts = stations_by_postcode(stations)
     low_supply = station_counts.tail(10)
-
     if "pc" in drivers.columns:
         driver_postcodes = drivers["pc"].value_counts().reset_index()
     else:
         driver_postcodes = drivers["postcode"].value_counts().reset_index()
     driver_postcodes.columns = ["postcode", "driver_count"]
-
     dc_count = len(stations[stations["connector1ChargeMethod"] == "DC"])
     avg_power = stations["connector1RatedOutputKW"].mean()
-
     return f"""
 INFRASTRUCTURE GAP ANALYSIS:
-
-Postcodes with FEWEST stations (potential build locations):
-{low_supply.to_string()}
-
-Postcode districts where surveyed drivers live (demand indicators):
-{driver_postcodes.head(10).to_string()}
-
+Postcodes with FEWEST stations: {low_supply.to_string()}
+Driver postcode districts (demand): {driver_postcodes.head(10).to_string()}
 Key gaps:
-- Only {dc_count} DC fast chargers across all 198 stations
-- Average power output is only {avg_power:.1f} kW
-- 79% of drivers prefer DC fast charging but only 3.5% of stations provide it
-- Stations concentrated in NE1 city centre while outer areas underserved
-- Driver satisfaction is 2.77/5 and 66% report difficulty finding stations
+- Only {dc_count} DC fast chargers across 198 stations
+- Average power only {avg_power:.1f} kW
+- 79% of drivers prefer DC but only 3.5% of stations provide it
+- Stations concentrated in NE1, outer areas underserved
+- Satisfaction 2.77/5, 66% report difficulty finding stations
 """
 
 # ============================================================
-# RAG RETRIEVAL
+# RAG + INTENT + ROUTING
 # ============================================================
 def retrieve(question, n_results=3):
-    results = collection.query(
-        query_texts=[question],
-        n_results=n_results
-    )
+    results = collection.query(query_texts=[question], n_results=n_results)
     return results["documents"][0]
 
-# ============================================================
-# INTENT DETECTION + POSTCODE EXTRACTION
-# ============================================================
 def detect_intent(question):
     system_prompt = """You are a query classifier for an EV charging assistant.
-Classify the user's question into exactly ONE of these categories:
-- sessions: anything about charging times, peak hours, energy, carbon, duration, utilisation, seasons, busiest times
-- drivers: anything about what drivers think, prefer, feel, satisfaction, waiting, how often they charge
-- stations: anything about charging stations in Newcastle generally, counts, connector types, 24 hour access
-- nearest: user gives a postcode or location and wants to find the nearest charging station
-- planning: questions about where to BUILD new stations, infrastructure gaps, underserved areas, city planner recommendations
-- general: anything else about EVs or charging
-
-The question may be casual, slang, or informal — classify the intent not the wording.
-Consider the conversation context if provided.
-Reply with ONLY the category name — one word, lowercase, no punctuation."""
-
+Classify into exactly ONE category:
+- sessions: charging times, peak hours, energy, carbon, duration, utilisation, seasons
+- drivers: driver preferences, satisfaction, waiting, charging frequency
+- stations: Newcastle stations generally, counts, connector types, 24hr access
+- nearest: user gives a postcode OR place name and wants nearest charging station
+- planning: where to BUILD new stations, gaps, underserved areas
+- general: anything else
+Casual or slang wording is fine — classify the intent.
+Reply ONLY the category name — one word, lowercase."""
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=10,
         system=system_prompt,
-        messages=[{
-            "role": "user",
-            "content": f"Classify this question: {question}"
-        }]
+        messages=[{"role": "user", "content": f"Classify: {question}"}]
     )
     return response.content[0].text.strip().lower()
 
-def extract_postcode(question):
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=15,
-        system="Extract the UK postcode from the message. Reply with ONLY the postcode, nothing else. If no postcode found reply NONE.",
-        messages=[{"role": "user", "content": question}]
-    )
-    postcode = response.content[0].text.strip()
-    return None if postcode == "NONE" else postcode
-
-# ============================================================
-# SOURCE LABELS
-# ============================================================
 SOURCE_LABELS = {
-    "sessions": "📊 *Source: EV Charging Sessions Dataset (29,775 verified sessions)*",
-    "drivers": "📊 *Source: NE England EV Driver Survey (124 respondents)*",
-    "stations": "📊 *Source: Newcastle Charging Stations Registry (198 stations)*",
-    "nearest": "📊 *Source: Newcastle Charging Stations Registry + postcodes.io geolocation*",
-    "planning": "📊 *Source: Cross-analysis of all 3 datasets (sessions + survey + stations)*",
-    "general": "📊 *Source: ChargeGPT knowledge base*"
+    "sessions": "*Source: EV Charging Sessions Dataset — 29,775 verified sessions*",
+    "drivers": "*Source: NE England EV Driver Survey — 124 respondents*",
+    "stations": "*Source: Newcastle Charging Stations Registry — 198 stations*",
+    "nearest": "*Source: Stations Registry + OpenStreetMap geolocation*",
+    "planning": "*Source: Cross-analysis of all 3 datasets*",
+    "general": "*Source: ChargeGPT knowledge base*"
 }
 
-# ============================================================
-# ROUTING
-# ============================================================
 def route(question):
     intent = detect_intent(question)
-
     if intent == "sessions":
         analytics_result = f"""
         Peak hour: {peak_hours(usb).iloc[0]['hour']}:00 with {peak_hours(usb).iloc[0]['session_count']} sessions
@@ -293,58 +274,51 @@ def route(question):
         Total stations: {len(stations)}
         """
     elif intent == "nearest":
-        postcode = extract_postcode(question)
-        if postcode:
-            nearest_info = find_nearest_stations(postcode)
-            if nearest_info:
-                analytics_result = f"NEAREST STATIONS TO {postcode}:\n{nearest_info}"
+        loc_type, location = extract_location(question)
+        if location:
+            if loc_type == "POSTCODE":
+                lat, lon = postcode_to_coords(location)
             else:
-                analytics_result = f"Could not find coordinates for postcode {postcode}. It may be invalid."
+                lat, lon = placename_to_coords(location)
+            if lat is not None:
+                analytics_result = f"NEAREST STATIONS TO {location}:\n{find_nearest_stations(lat, lon)}"
+            else:
+                analytics_result = f"Could not locate '{location}'. It may be invalid or outside Newcastle."
         else:
-            analytics_result = "No postcode detected. Ask the user to provide their postcode."
+            analytics_result = "No location detected. Ask the user for their postcode or a nearby landmark."
     elif intent == "planning":
         analytics_result = infrastructure_gap_analysis()
     else:
-        analytics_result = "No specific dataset analytics available for this question."
-
+        analytics_result = "No specific dataset analytics available."
     rag_context = retrieve(question)
     return intent, analytics_result, rag_context
 
 # ============================================================
-# ANSWER FUNCTIONS — with conversation memory
+# ANSWER FUNCTIONS
 # ============================================================
 def build_conversation_context():
-    """Get last 4 messages for context"""
     if "messages" not in st.session_state:
         return ""
     recent = st.session_state.messages[-4:]
-    context_lines = []
-    for msg in recent:
-        role = "User" if msg["role"] == "user" else "Assistant"
-        context_lines.append(f"{role}: {msg['content'][:200]}")
-    return "\n".join(context_lines)
+    return "\n".join(
+        f"{'User' if m['role']=='user' else 'Assistant'}: {m['content'][:200]}"
+        for m in recent
+    )
 
 def answer(question):
     conversation_context = build_conversation_context()
     intent, analytics_result, rag_context = route(question)
     rag_text = "\n".join(rag_context)
-
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=400,
-        system="""You are ChargeGPT, a friendly and knowledgeable EV charging assistant for Newcastle.
-Answer in a conversational, natural tone — not robotic or formal.
-Use the analytics data and evidence provided to ground your answers in real numbers.
-Use the conversation history to understand follow-up questions and context.
-If someone asks casually, respond casually but still give accurate data.
-For nearest station queries, list stations clearly with distance and key features.
-For planning queries, give clear recommendations based on the gap analysis.
-Always include specific numbers from the data.
-Never invent numbers not present in the provided data.
-Keep answers concise.""",
-        messages=[{
-            "role": "user",
-            "content": f"""Conversation history:
+        system="""You are ChargeGPT, a friendly EV charging assistant for Newcastle.
+Answer conversationally, grounded in the provided data.
+Use conversation history for follow-up context.
+For nearest station queries, list stations clearly with distance and features.
+For planning queries, give clear recommendations.
+Always quote specific numbers. Never invent numbers. Keep answers concise.""",
+        messages=[{"role": "user", "content": f"""Conversation history:
 {conversation_context}
 
 Analytics data:
@@ -353,8 +327,7 @@ Analytics data:
 Evidence:
 {rag_text}
 
-Current question: {question}"""
-        }]
+Current question: {question}"""}]
     )
     return response.content[0].text, intent
 
@@ -367,331 +340,196 @@ def answer_llm_only(question):
     return response.content[0].text
 
 def answer_rag_only(question):
-    context = retrieve(question)
-    rag_text = "\n".join(context)
+    rag_text = "\n".join(retrieve(question))
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=300,
         system="Answer using only the evidence provided. Quote specific numbers.",
-        messages=[{
-            "role": "user",
-            "content": f"Evidence:\n{rag_text}\n\nQuestion: {question}"
-        }]
+        messages=[{"role": "user", "content": f"Evidence:\n{rag_text}\n\nQuestion: {question}"}]
     )
     return response.content[0].text
 
-# ============================================================
-# FOLLOW-UP SUGGESTIONS
-# ============================================================
 FOLLOW_UPS = {
-    "sessions": [
-        "Which season is cleanest for charging?",
-        "What's the quietest time to charge?",
-        "How long do sessions usually last?"
-    ],
-    "drivers": [
-        "How satisfied are drivers with charging?",
-        "How long will drivers wait for a charger?",
-        "How often do drivers charge weekly?"
-    ],
-    "stations": [
-        "How many fast chargers exist in Newcastle?",
-        "Which stations are open 24 hours?",
-        "Which postcode has the most chargers?"
-    ],
-    "nearest": [
-        "Are any of these open 24 hours?",
-        "Which one is a fast charger?",
-        "Show stations near NE1 instead"
-    ],
-    "planning": [
-        "Which postcodes need DC fast chargers most?",
-        "What do drivers say about availability?",
-        "Where is demand highest?"
-    ],
-    "general": [
-        "What are the peak charging hours?",
-        "Find my nearest charging station",
-        "Where should new stations be built?"
-    ]
+    "sessions": ["Which season is cleanest?", "Quietest time to charge?", "Average session length?"],
+    "drivers": ["How satisfied are drivers?", "How long will drivers wait?", "Weekly charging frequency?"],
+    "stations": ["How many fast chargers?", "Which are open 24 hours?", "Most chargers by postcode?"],
+    "nearest": ["Any open 24 hours?", "Which is fastest?", "Stations near Eldon Square?"],
+    "planning": ["Where are DC chargers needed?", "What do drivers say?", "Where is demand highest?"],
+    "general": ["Peak charging hours?", "Find my nearest station", "Where to build new stations?"]
 }
 
 # ============================================================
-# STREAMLIT UI — Professional Design
+# CHAT HISTORY MANAGEMENT
+# ============================================================
+def init_state():
+    if "user_email" not in st.session_state:
+        st.session_state.user_email = None
+    if "all_chats" not in st.session_state:
+        st.session_state.all_chats = {}  # {email: [{title, messages, created}]}
+    if "current_chat_index" not in st.session_state:
+        st.session_state.current_chat_index = None
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "pending_question" not in st.session_state:
+        st.session_state.pending_question = None
+    if "last_intent" not in st.session_state:
+        st.session_state.last_intent = "general"
+
+def welcome_message():
+    return {
+        "role": "assistant",
+        "content": "Hey! I'm **ChargeGPT** — your EV charging assistant for Newcastle.\n\nAsk me anything: find your nearest charger, explore demand patterns, or get planning recommendations. Everything is grounded in real data."
+    }
+
+def new_chat():
+    email = st.session_state.user_email
+    # Save current chat if it has real content
+    if st.session_state.messages and len(st.session_state.messages) > 1:
+        first_user_msg = next((m["content"] for m in st.session_state.messages if m["role"] == "user"), "Chat")
+        title = first_user_msg[:40] + ("..." if len(first_user_msg) > 40 else "")
+        if email not in st.session_state.all_chats:
+            st.session_state.all_chats[email] = []
+        # Update existing or append new
+        if st.session_state.current_chat_index is not None:
+            st.session_state.all_chats[email][st.session_state.current_chat_index]["messages"] = st.session_state.messages
+        else:
+            st.session_state.all_chats[email].append({
+                "title": title,
+                "messages": st.session_state.messages,
+                "created": datetime.now().strftime("%d %b %H:%M")
+            })
+    st.session_state.messages = [welcome_message()]
+    st.session_state.current_chat_index = None
+    st.session_state.last_intent = "general"
+
+def load_chat(index):
+    email = st.session_state.user_email
+    # Save current first
+    if st.session_state.messages and len(st.session_state.messages) > 1 and st.session_state.current_chat_index is None:
+        first_user_msg = next((m["content"] for m in st.session_state.messages if m["role"] == "user"), "Chat")
+        title = first_user_msg[:40]
+        st.session_state.all_chats[email].append({
+            "title": title,
+            "messages": st.session_state.messages,
+            "created": datetime.now().strftime("%d %b %H:%M")
+        })
+    st.session_state.messages = st.session_state.all_chats[email][index]["messages"]
+    st.session_state.current_chat_index = index
+
+init_state()
+
+# ============================================================
+# UI — MINIMAL DARK
 # ============================================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+* { font-family: 'Inter', -apple-system, sans-serif !important; }
+.stApp { background: #0e0e10; }
+#MainMenu, footer, header { visibility: hidden; }
+.block-container { max-width: 760px !important; padding-top: 2rem !important; }
 
-* {
-    font-family: 'Inter', -apple-system, sans-serif !important;
-}
+h1 { color: #fafafa !important; font-size: 1.9rem !important; font-weight: 600 !important; letter-spacing: -0.4px !important; margin-bottom: 0 !important; }
+.stApp [data-testid="stCaptionContainer"] p { color: #71717a !important; font-size: 0.88rem !important; }
 
-/* App background — clean dark */
-.stApp {
-    background: #0b0f19;
-}
+.stChatMessage { background: #17171a !important; border: 1px solid #26262b !important; border-radius: 12px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) { background: #1c1c21 !important; }
+.stChatMessage p, .stChatMessage li { color: #d4d4d8 !important; font-size: 0.92rem !important; line-height: 1.65 !important; }
+.stChatMessage strong { color: #fafafa !important; }
+.stChatMessage em { color: #71717a !important; font-size: 0.8rem !important; }
 
-/* Hide streamlit branding */
-#MainMenu, footer, header {
-    visibility: hidden;
-}
+.stChatInput textarea { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 12px !important; color: #fafafa !important; font-size: 0.92rem !important; }
+.stChatInput textarea:focus { border-color: #52525b !important; box-shadow: none !important; }
+.stChatInput textarea::placeholder { color: #52525b !important; }
 
-/* Main container width */
-.block-container {
-    max-width: 780px !important;
-    padding-top: 2.5rem !important;
-}
+[data-testid="stSidebar"] { background: #111113 !important; border-right: 1px solid #26262b !important; }
+[data-testid="stSidebar"] .stMarkdown h3 { color: #a1a1aa !important; font-size: 0.72rem !important; font-weight: 600 !important; text-transform: uppercase !important; letter-spacing: 1px !important; }
+[data-testid="stSidebar"] .stMarkdown p { color: #a1a1aa !important; font-size: 0.84rem !important; }
+[data-testid="stSidebar"] hr { border-color: #26262b !important; margin: 1rem 0 !important; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { color: #52525b !important; font-size: 0.78rem !important; }
 
-/* Title */
-h1 {
-    color: #ffffff !important;
-    font-size: 2.2rem !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.5px !important;
-    margin-bottom: 0 !important;
-}
+.stSelectbox > div > div { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; font-size: 0.86rem !important; }
+.stSelectbox label { color: #71717a !important; font-size: 0.8rem !important; }
 
-/* Caption under title */
-.stApp [data-testid="stCaptionContainer"] p {
-    color: #64748b !important;
-    font-size: 0.92rem !important;
-    margin-top: 4px !important;
-}
+.stTextInput input { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; font-size: 0.86rem !important; }
+.stTextInput label { color: #71717a !important; font-size: 0.8rem !important; }
 
-/* Chat messages — clean cards */
-.stChatMessage {
-    background: #111827 !important;
-    border: 1px solid #1e293b !important;
-    border-radius: 14px !important;
-    padding: 16px 20px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
-}
+.stButton button { background: #1c1c21 !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #a1a1aa !important; font-size: 0.78rem !important; font-weight: 500 !important; padding: 5px 12px !important; width: 100% !important; text-align: left !important; }
+.stButton button:hover { background: #26262b !important; color: #fafafa !important; border-color: #3f3f46 !important; }
 
-/* User messages — subtle accent */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: #0f1b2d !important;
-    border-color: #1e3a5f !important;
-}
-
-/* Message text */
-.stChatMessage p, .stChatMessage li {
-    color: #e2e8f0 !important;
-    font-size: 0.94rem !important;
-    line-height: 1.65 !important;
-}
-
-.stChatMessage strong {
-    color: #ffffff !important;
-    font-weight: 600 !important;
-}
-
-/* Chat input */
-.stChatInput {
-    padding-bottom: 1rem !important;
-}
-
-.stChatInput textarea {
-    background: #111827 !important;
-    border: 1px solid #2d3b50 !important;
-    border-radius: 12px !important;
-    color: #f1f5f9 !important;
-    font-size: 0.94rem !important;
-    padding: 14px 18px !important;
-}
-
-.stChatInput textarea:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
-}
-
-.stChatInput textarea::placeholder {
-    color: #475569 !important;
-}
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: #0d1220 !important;
-    border-right: 1px solid #1e293b !important;
-}
-
-[data-testid="stSidebar"] .stMarkdown h3 {
-    color: #f1f5f9 !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.8px !important;
-}
-
-[data-testid="stSidebar"] .stMarkdown p {
-    color: #94a3b8 !important;
-    font-size: 0.85rem !important;
-}
-
-[data-testid="stSidebar"] hr {
-    border-color: #1e293b !important;
-    margin: 1.2rem 0 !important;
-}
-
-/* Selectbox */
-.stSelectbox > div > div {
-    background: #111827 !important;
-    border: 1px solid #2d3b50 !important;
-    border-radius: 10px !important;
-    color: #f1f5f9 !important;
-    font-size: 0.9rem !important;
-}
-
-.stSelectbox label {
-    color: #94a3b8 !important;
-    font-size: 0.85rem !important;
-}
-
-/* Follow-up buttons — pill style */
-.stButton button {
-    background: transparent !important;
-    border: 1px solid #2d3b50 !important;
-    border-radius: 100px !important;
-    color: #94a3b8 !important;
-    font-size: 0.78rem !important;
-    font-weight: 500 !important;
-    padding: 6px 14px !important;
-    transition: all 0.15s ease !important;
-    white-space: nowrap !important;
-    width: 100% !important;
-}
-
-.stButton button:hover {
-    background: #1e3a5f !important;
-    border-color: #3b82f6 !important;
-    color: #ffffff !important;
-}
-
-/* Spinner */
-.stSpinner > div {
-    border-top-color: #3b82f6 !important;
-}
-
-/* Map container */
-[data-testid="stDeckGlJsonChart"] {
-    border-radius: 14px !important;
-    overflow: hidden !important;
-    border: 1px solid #1e293b !important;
-}
-
-/* Caption text in sidebar */
-[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-    color: #64748b !important;
-    font-size: 0.8rem !important;
-    line-height: 1.5 !important;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-    width: 6px;
-}
-::-webkit-scrollbar-track {
-    background: #0b0f19;
-}
-::-webkit-scrollbar-thumb {
-    background: #2d3b50;
-    border-radius: 3px;
-}
+.stSpinner > div { border-top-color: #a1a1aa !important; }
+[data-testid="stDeckGlJsonChart"] { border-radius: 12px !important; overflow: hidden !important; border: 1px solid #26262b !important; }
+[data-testid="stExpander"] { background: #17171a !important; border: 1px solid #26262b !important; border-radius: 10px !important; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0e0e10; }
+::-webkit-scrollbar-thumb { background: #303036; border-radius: 3px; }
 </style>
 """, unsafe_allow_html=True)
 
-# Header with badge
-col1, col2 = st.columns([0.8, 0.2])
-with col1:
-    st.title("⚡ ChargeGPT")
-    st.caption("AI-powered EV charging intelligence for Newcastle — grounded in real data")
-with col2:
-    st.markdown("""
-    <div style="text-align:right; padding-top:20px;">
-        <span style="background:#052e16; color:#4ade80; padding:5px 12px;
-        border-radius:100px; font-size:0.72rem; font-weight:600;
-        border:1px solid #14532d;">● LIVE</span>
-    </div>
-    """, unsafe_allow_html=True)
+st.title("⚡ ChargeGPT")
+st.caption("Data-grounded EV charging intelligence for Newcastle")
 
-st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
+# ============================================================
+# SIDEBAR
+# ============================================================
 with st.sidebar:
-    st.markdown("""
-    <div style="padding:4px 0 12px 0;">
-        <span style="font-size:1.4rem; font-weight:700; color:#fff;">⚡ ChargeGPT</span><br>
-        <span style="font-size:0.75rem; color:#64748b;">v1.0 — Newcastle University</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### Account")
+    if st.session_state.user_email is None:
+        email_input = st.text_input("Enter email to save chat history", placeholder="you@email.com")
+        if email_input and "@" in email_input:
+            st.session_state.user_email = email_input.strip().lower()
+            if st.session_state.user_email not in st.session_state.all_chats:
+                st.session_state.all_chats[st.session_state.user_email] = []
+            st.rerun()
+    else:
+        st.caption(f"Signed in: {st.session_state.user_email}")
+        if st.button("＋ New chat"):
+            new_chat()
+            st.rerun()
+
+        # Chat history
+        user_chats = st.session_state.all_chats.get(st.session_state.user_email, [])
+        if user_chats:
+            with st.expander(f"Chat history ({len(user_chats)})"):
+                for i, chat in enumerate(reversed(user_chats)):
+                    real_index = len(user_chats) - 1 - i
+                    if st.button(f"{chat['title']}", key=f"hist_{real_index}"):
+                        load_chat(real_index)
+                        st.rerun()
 
     st.markdown("---")
-    st.markdown("### System Mode")
+    st.markdown("### Mode")
     mode = st.selectbox(
         "Response mode",
         ["Full ChargeGPT", "LLM + RAG only", "LLM only (baseline)"],
         label_visibility="collapsed"
     )
-
     if mode == "Full ChargeGPT":
-        st.markdown("""
-        <div style="background:#052e16; border:1px solid #14532d; border-radius:10px; padding:10px 14px; margin-top:8px;">
-            <span style="color:#4ade80; font-size:0.8rem; font-weight:600;">● Full system active</span><br>
-            <span style="color:#64748b; font-size:0.75rem;">Analytics engine + RAG + Claude LLM</span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.caption("Analytics + RAG + LLM — most accurate")
     elif mode == "LLM + RAG only":
-        st.markdown("""
-        <div style="background:#2d2006; border:1px solid #713f12; border-radius:10px; padding:10px 14px; margin-top:8px;">
-            <span style="color:#facc15; font-size:0.8rem; font-weight:600;">● RAG mode active</span><br>
-            <span style="color:#64748b; font-size:0.75rem;">Knowledge base + Claude LLM</span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.caption("Knowledge base + LLM")
     else:
-        st.markdown("""
-        <div style="background:#2d0a0a; border:1px solid #7f1d1d; border-radius:10px; padding:10px 14px; margin-top:8px;">
-            <span style="color:#f87171; font-size:0.8rem; font-weight:600;">● Baseline mode</span><br>
-            <span style="color:#64748b; font-size:0.75rem;">No data grounding — may hallucinate</span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.caption("LLM only — no data grounding")
 
     st.markdown("---")
-    st.markdown("### Data Sources")
-    st.markdown("""
-    <div style="font-size:0.82rem; color:#94a3b8; line-height:2;">
-    <span style="color:#3b82f6;">▸</span> 29,775 charging sessions<br>
-    <span style="color:#3b82f6;">▸</span> 124 EV driver surveys<br>
-    <span style="color:#3b82f6;">▸</span> 198 Newcastle stations
-    </div>
-    <div style="font-size:0.72rem; color:#475569; margin-top:6px;">All data verified · July 2026</div>
-    """, unsafe_allow_html=True)
+    st.markdown("### Data")
+    st.caption("29,775 charging sessions")
+    st.caption("124 driver survey responses")
+    st.caption("198 Newcastle stations")
 
     st.markdown("---")
-    st.markdown("### Quick Prompts")
-    st.markdown("""
-    <div style="font-size:0.8rem; color:#94a3b8; line-height:2.1;">
-    "Nearest charger to NE4 6PL"<br>
-    "When's the busiest time to charge?"<br>
-    "Where should new stations go?"<br>
-    "Do drivers prefer fast chargers?"
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### Try")
+    st.caption('"Nearest charger to Primark"')
+    st.caption('"Nearest charger to NE4 6PL"')
+    st.caption('"When is charging busiest?"')
+    st.caption('"Where should stations be built?"')
 
-# Initialise state
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": "Hey! I'm **ChargeGPT** — your EV charging assistant for Newcastle.\n\nI can find your nearest charger, analyse demand patterns, and advise planners on where to build next. Everything I say is grounded in real data.\n\nWhat would you like to know?"
-    })
+# ============================================================
+# CHAT AREA
+# ============================================================
+if not st.session_state.messages:
+    st.session_state.messages = [welcome_message()]
 
-if "pending_question" not in st.session_state:
-    st.session_state.pending_question = None
-
-if "last_intent" not in st.session_state:
-    st.session_state.last_intent = "general"
-
-# Display conversation
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -700,14 +538,13 @@ for message in st.session_state.messages:
 if len(st.session_state.messages) > 1:
     suggestions = FOLLOW_UPS.get(st.session_state.last_intent, FOLLOW_UPS["general"])
     cols = st.columns(len(suggestions))
-    for i, suggestion in enumerate(suggestions):
+    for i, s in enumerate(suggestions):
         with cols[i]:
-            if st.button(suggestion, key=f"followup_{len(st.session_state.messages)}_{i}"):
-                st.session_state.pending_question = suggestion
+            if st.button(s, key=f"fu_{len(st.session_state.messages)}_{i}"):
+                st.session_state.pending_question = s
                 st.rerun()
 
-# Input
-user_input = st.chat_input("Ask anything about EV charging in Newcastle...")
+user_input = st.chat_input("Ask about EV charging — try a postcode or place name...")
 
 question_to_process = None
 if user_input:
@@ -722,7 +559,7 @@ if question_to_process:
     st.session_state.messages.append({"role": "user", "content": question_to_process})
 
     with st.chat_message("assistant"):
-        with st.spinner("Analysing real data..."):
+        with st.spinner("Analysing..."):
             if mode == "Full ChargeGPT":
                 response, intent = answer(question_to_process)
                 st.session_state.last_intent = intent
@@ -734,12 +571,15 @@ if question_to_process:
                 response = answer_llm_only(question_to_process)
                 intent = None
         st.markdown(response)
-
         if intent in ["stations", "nearest", "planning"]:
             st.map(stations[["latitude", "longitude"]])
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": response
-    })
+    st.session_state.messages.append({"role": "assistant", "content": response})
+
+    # Auto-save to history if signed in
+    if st.session_state.user_email:
+        email = st.session_state.user_email
+        if st.session_state.current_chat_index is not None:
+            st.session_state.all_chats[email][st.session_state.current_chat_index]["messages"] = st.session_state.messages
+
     st.rerun()
