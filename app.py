@@ -1,9 +1,10 @@
 # ============================================================
-# ChargeGPT — app.py — FINAL
+# ChargeGPT — app.py — FINAL with persistent chat history
 # ============================================================
 
 import os
 import math
+import json
 import requests
 import streamlit as st
 import pandas as pd
@@ -13,7 +14,12 @@ from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 from datetime import datetime
 
-st.set_page_config(page_title="ChargeGPT", page_icon="⚡", layout="centered")
+st.set_page_config(
+    page_title="ChargeGPT",
+    page_icon="⚡",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
 
 # ============================================================
 # SETUP
@@ -49,6 +55,25 @@ def setup_rag():
 
 usb, drivers, stations = load_data()
 collection = setup_rag()
+
+# ============================================================
+# PERSISTENT CHAT STORAGE
+# ============================================================
+CHATS_FILE = "saved_chats.json"
+
+def load_chats_from_disk():
+    try:
+        with open(CHATS_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_chats_to_disk():
+    try:
+        with open(CHATS_FILE, "w") as f:
+            json.dump(st.session_state.all_chats, f)
+    except Exception:
+        pass
 
 # ============================================================
 # ANALYTICS FUNCTIONS
@@ -358,7 +383,7 @@ def init_state():
     if "user_email" not in st.session_state:
         st.session_state.user_email = None
     if "all_chats" not in st.session_state:
-        st.session_state.all_chats = {}
+        st.session_state.all_chats = load_chats_from_disk()
     if "current_chat_index" not in st.session_state:
         st.session_state.current_chat_index = None
     if "messages" not in st.session_state:
@@ -379,6 +404,8 @@ def save_current_chat():
     if not email:
         return
     if st.session_state.messages and len(st.session_state.messages) > 1:
+        if email not in st.session_state.all_chats:
+            st.session_state.all_chats[email] = []
         if st.session_state.current_chat_index is not None:
             st.session_state.all_chats[email][st.session_state.current_chat_index]["messages"] = st.session_state.messages
         else:
@@ -390,6 +417,7 @@ def save_current_chat():
                 "created": datetime.now().strftime("%d %b %H:%M")
             })
             st.session_state.current_chat_index = len(st.session_state.all_chats[email]) - 1
+    save_chats_to_disk()
 
 def new_chat():
     save_current_chat()
@@ -406,7 +434,7 @@ def load_chat(index):
 init_state()
 
 # ============================================================
-# UI — MINIMAL DARK
+# UI
 # ============================================================
 st.markdown("""
 <style>
@@ -415,38 +443,26 @@ st.markdown("""
 .stApp { background: #0e0e10; }
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { max-width: 760px !important; padding-top: 2rem !important; }
-
-h1 { color: #fafafa !important; font-size: 1.9rem !important; font-weight: 600 !important; letter-spacing: -0.4px !important; margin-bottom: 0 !important; }
+h1 { color: #fafafa !important; font-size: 1.9rem !important; font-weight: 600 !important; margin-bottom: 0 !important; }
 .stApp [data-testid="stCaptionContainer"] p { color: #71717a !important; font-size: 0.88rem !important; }
-
 .stChatMessage { background: #17171a !important; border: 1px solid #26262b !important; border-radius: 12px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) { background: #1c1c21 !important; }
 .stChatMessage p, .stChatMessage li { color: #d4d4d8 !important; font-size: 0.92rem !important; line-height: 1.65 !important; }
 .stChatMessage strong { color: #fafafa !important; }
 .stChatMessage em { color: #71717a !important; font-size: 0.8rem !important; }
-
-.stChatInput textarea { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 12px !important; color: #fafafa !important; font-size: 0.92rem !important; }
+.stChatInput textarea { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 12px !important; color: #fafafa !important; }
 .stChatInput textarea:focus { border-color: #52525b !important; box-shadow: none !important; }
-.stChatInput textarea::placeholder { color: #52525b !important; }
-
 [data-testid="stSidebar"] { background: #111113 !important; border-right: 1px solid #26262b !important; }
 [data-testid="stSidebar"] hr { border-color: #26262b !important; margin: 1rem 0 !important; }
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { color: #52525b !important; font-size: 0.76rem !important; }
-
-.stSelectbox > div > div { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; font-size: 0.86rem !important; }
-
-.stTextInput input { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; font-size: 0.86rem !important; }
-
-/* New chat — white pill like Claude */
+.stSelectbox > div > div { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; }
+.stTextInput input { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; }
 [data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button {
     background: #fafafa !important; color: #0e0e10 !important;
     border-radius: 100px !important; font-weight: 600 !important;
     text-align: center !important; border: none !important;
-    font-size: 0.86rem !important; padding: 8px 14px !important;
 }
 [data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button:hover { background: #d4d4d8 !important; }
-
-/* History rows — quiet like Claude recents */
 [data-testid="stSidebar"] .stButton button {
     background: transparent !important; border: none !important;
     color: #d4d4d8 !important; font-size: 0.84rem !important;
@@ -456,8 +472,6 @@ h1 { color: #fafafa !important; font-size: 1.9rem !important; font-weight: 600 !
     text-overflow: ellipsis !important;
 }
 [data-testid="stSidebar"] .stButton button:hover { background: #1c1c21 !important; color: #fafafa !important; }
-
-/* Main area follow-up buttons */
 .block-container .stButton button {
     background: #17171a !important; border: 1px solid #303036 !important;
     border-radius: 100px !important; color: #a1a1aa !important;
@@ -465,9 +479,8 @@ h1 { color: #fafafa !important; font-size: 1.9rem !important; font-weight: 600 !
     text-align: center !important;
 }
 .block-container .stButton button:hover { background: #26262b !important; color: #fafafa !important; }
-
 .stSpinner > div { border-top-color: #a1a1aa !important; }
-[data-testid="stDeckGlJsonChart"] { border-radius: 12px !important; overflow: hidden !important; border: 1px solid #26262b !important; }
+[data-testid="stDeckGlJsonChart"] { border-radius: 12px !important; border: 1px solid #26262b !important; }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: #0e0e10; }
 ::-webkit-scrollbar-thumb { background: #303036; border-radius: 3px; }
@@ -477,9 +490,6 @@ h1 { color: #fafafa !important; font-size: 1.9rem !important; font-weight: 600 !
 st.title("⚡ ChargeGPT")
 st.caption("Data-grounded EV charging intelligence for Newcastle")
 
-# ============================================================
-# SIDEBAR — Claude style
-# ============================================================
 with st.sidebar:
     st.markdown("""
     <div style="padding:8px 0 16px 0;">
@@ -532,9 +542,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ============================================================
-# CHAT AREA
-# ============================================================
 if not st.session_state.messages:
     st.session_state.messages = [welcome_message()]
 
