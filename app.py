@@ -1,6 +1,5 @@
 # ============================================================
-# ChargeGPT — app.py
-# Clean UI + chat history + location search
+# ChargeGPT — app.py — FINAL
 # ============================================================
 
 import os
@@ -109,7 +108,7 @@ def chargers_open_24hr(df):
     return r
 
 # ============================================================
-# LOCATION SEARCH — postcodes AND place names
+# LOCATION SEARCH
 # ============================================================
 def postcode_to_coords(postcode):
     try:
@@ -123,14 +122,9 @@ def postcode_to_coords(postcode):
         return None, None
 
 def placename_to_coords(place):
-    """Convert a place name like 'Primark Newcastle' to coordinates using OpenStreetMap Nominatim (free)"""
     try:
         url = "https://nominatim.openstreetmap.org/search"
-        params = {
-            "q": f"{place}, Newcastle upon Tyne, UK",
-            "format": "json",
-            "limit": 1
-        }
+        params = {"q": f"{place}, Newcastle upon Tyne, UK", "format": "json", "limit": 1}
         headers = {"User-Agent": "ChargeGPT-Dissertation-Project"}
         response = requests.get(url, params=params, headers=headers, timeout=5)
         data = response.json()
@@ -172,14 +166,13 @@ Status: {row['chargeDeviceStatus']}
     return "\n".join(results)
 
 def extract_location(question):
-    """Extract postcode OR place name from question using Claude"""
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=30,
         system="""Extract the location from the message. It could be a UK postcode (like NE4 6PL) or a place name (like Primark, Eldon Square, St James Park).
-If it is a postcode reply: POSTCODE|<the postcode>
-If it is a place name reply: PLACE|<the place name>
-If no location found reply: NONE""",
+If postcode reply: POSTCODE|<the postcode>
+If place name reply: PLACE|<the place name>
+If none reply: NONE""",
         messages=[{"role": "user", "content": question}]
     )
     result = response.content[0].text.strip()
@@ -191,7 +184,7 @@ If no location found reply: NONE""",
     return None, None
 
 # ============================================================
-# INFRASTRUCTURE GAP ANALYSIS
+# GAP ANALYSIS
 # ============================================================
 def infrastructure_gap_analysis():
     station_counts = stations_by_postcode(stations)
@@ -216,7 +209,7 @@ Key gaps:
 """
 
 # ============================================================
-# RAG + INTENT + ROUTING
+# RAG + INTENT
 # ============================================================
 def retrieve(question, n_results=3):
     results = collection.query(query_texts=[question], n_results=n_results)
@@ -228,10 +221,10 @@ Classify into exactly ONE category:
 - sessions: charging times, peak hours, energy, carbon, duration, utilisation, seasons
 - drivers: driver preferences, satisfaction, waiting, charging frequency
 - stations: Newcastle stations generally, counts, connector types, 24hr access
-- nearest: user gives a postcode OR place name and wants nearest charging station
+- nearest: user gives a postcode OR place name wanting nearest charging station
 - planning: where to BUILD new stations, gaps, underserved areas
 - general: anything else
-Casual or slang wording is fine — classify the intent.
+Casual wording is fine — classify the intent.
 Reply ONLY the category name — one word, lowercase."""
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
@@ -283,9 +276,9 @@ def route(question):
             if lat is not None:
                 analytics_result = f"NEAREST STATIONS TO {location}:\n{find_nearest_stations(lat, lon)}"
             else:
-                analytics_result = f"Could not locate '{location}'. It may be invalid or outside Newcastle."
+                analytics_result = f"Could not locate '{location}'."
         else:
-            analytics_result = "No location detected. Ask the user for their postcode or a nearby landmark."
+            analytics_result = "No location detected. Ask user for postcode or landmark."
     elif intent == "planning":
         analytics_result = infrastructure_gap_analysis()
     else:
@@ -359,13 +352,13 @@ FOLLOW_UPS = {
 }
 
 # ============================================================
-# CHAT HISTORY MANAGEMENT
+# STATE + HISTORY
 # ============================================================
 def init_state():
     if "user_email" not in st.session_state:
         st.session_state.user_email = None
     if "all_chats" not in st.session_state:
-        st.session_state.all_chats = {}  # {email: [{title, messages, created}]}
+        st.session_state.all_chats = {}
     if "current_chat_index" not in st.session_state:
         st.session_state.current_chat_index = None
     if "messages" not in st.session_state:
@@ -381,38 +374,32 @@ def welcome_message():
         "content": "Hey! I'm **ChargeGPT** — your EV charging assistant for Newcastle.\n\nAsk me anything: find your nearest charger, explore demand patterns, or get planning recommendations. Everything is grounded in real data."
     }
 
-def new_chat():
+def save_current_chat():
     email = st.session_state.user_email
-    # Save current chat if it has real content
+    if not email:
+        return
     if st.session_state.messages and len(st.session_state.messages) > 1:
-        first_user_msg = next((m["content"] for m in st.session_state.messages if m["role"] == "user"), "Chat")
-        title = first_user_msg[:40] + ("..." if len(first_user_msg) > 40 else "")
-        if email not in st.session_state.all_chats:
-            st.session_state.all_chats[email] = []
-        # Update existing or append new
         if st.session_state.current_chat_index is not None:
             st.session_state.all_chats[email][st.session_state.current_chat_index]["messages"] = st.session_state.messages
         else:
+            first_user_msg = next((m["content"] for m in st.session_state.messages if m["role"] == "user"), "Chat")
+            title = first_user_msg[:38] + ("..." if len(first_user_msg) > 38 else "")
             st.session_state.all_chats[email].append({
                 "title": title,
                 "messages": st.session_state.messages,
                 "created": datetime.now().strftime("%d %b %H:%M")
             })
+            st.session_state.current_chat_index = len(st.session_state.all_chats[email]) - 1
+
+def new_chat():
+    save_current_chat()
     st.session_state.messages = [welcome_message()]
     st.session_state.current_chat_index = None
     st.session_state.last_intent = "general"
 
 def load_chat(index):
+    save_current_chat()
     email = st.session_state.user_email
-    # Save current first
-    if st.session_state.messages and len(st.session_state.messages) > 1 and st.session_state.current_chat_index is None:
-        first_user_msg = next((m["content"] for m in st.session_state.messages if m["role"] == "user"), "Chat")
-        title = first_user_msg[:40]
-        st.session_state.all_chats[email].append({
-            "title": title,
-            "messages": st.session_state.messages,
-            "created": datetime.now().strftime("%d %b %H:%M")
-        })
     st.session_state.messages = st.session_state.all_chats[email][index]["messages"]
     st.session_state.current_chat_index = index
 
@@ -443,23 +430,44 @@ h1 { color: #fafafa !important; font-size: 1.9rem !important; font-weight: 600 !
 .stChatInput textarea::placeholder { color: #52525b !important; }
 
 [data-testid="stSidebar"] { background: #111113 !important; border-right: 1px solid #26262b !important; }
-[data-testid="stSidebar"] .stMarkdown h3 { color: #a1a1aa !important; font-size: 0.72rem !important; font-weight: 600 !important; text-transform: uppercase !important; letter-spacing: 1px !important; }
-[data-testid="stSidebar"] .stMarkdown p { color: #a1a1aa !important; font-size: 0.84rem !important; }
 [data-testid="stSidebar"] hr { border-color: #26262b !important; margin: 1rem 0 !important; }
-[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { color: #52525b !important; font-size: 0.78rem !important; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { color: #52525b !important; font-size: 0.76rem !important; }
 
 .stSelectbox > div > div { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; font-size: 0.86rem !important; }
-.stSelectbox label { color: #71717a !important; font-size: 0.8rem !important; }
 
 .stTextInput input { background: #17171a !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #fafafa !important; font-size: 0.86rem !important; }
-.stTextInput label { color: #71717a !important; font-size: 0.8rem !important; }
 
-.stButton button { background: #1c1c21 !important; border: 1px solid #303036 !important; border-radius: 8px !important; color: #a1a1aa !important; font-size: 0.78rem !important; font-weight: 500 !important; padding: 5px 12px !important; width: 100% !important; text-align: left !important; }
-.stButton button:hover { background: #26262b !important; color: #fafafa !important; border-color: #3f3f46 !important; }
+/* New chat — white pill like Claude */
+[data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button {
+    background: #fafafa !important; color: #0e0e10 !important;
+    border-radius: 100px !important; font-weight: 600 !important;
+    text-align: center !important; border: none !important;
+    font-size: 0.86rem !important; padding: 8px 14px !important;
+}
+[data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button:hover { background: #d4d4d8 !important; }
+
+/* History rows — quiet like Claude recents */
+[data-testid="stSidebar"] .stButton button {
+    background: transparent !important; border: none !important;
+    color: #d4d4d8 !important; font-size: 0.84rem !important;
+    text-align: left !important; padding: 7px 10px !important;
+    border-radius: 8px !important; width: 100% !important;
+    white-space: nowrap !important; overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+[data-testid="stSidebar"] .stButton button:hover { background: #1c1c21 !important; color: #fafafa !important; }
+
+/* Main area follow-up buttons */
+.block-container .stButton button {
+    background: #17171a !important; border: 1px solid #303036 !important;
+    border-radius: 100px !important; color: #a1a1aa !important;
+    font-size: 0.78rem !important; padding: 5px 12px !important;
+    text-align: center !important;
+}
+.block-container .stButton button:hover { background: #26262b !important; color: #fafafa !important; }
 
 .stSpinner > div { border-top-color: #a1a1aa !important; }
 [data-testid="stDeckGlJsonChart"] { border-radius: 12px !important; overflow: hidden !important; border: 1px solid #26262b !important; }
-[data-testid="stExpander"] { background: #17171a !important; border: 1px solid #26262b !important; border-radius: 10px !important; }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: #0e0e10; }
 ::-webkit-scrollbar-thumb { background: #303036; border-radius: 3px; }
@@ -470,59 +478,59 @@ st.title("⚡ ChargeGPT")
 st.caption("Data-grounded EV charging intelligence for Newcastle")
 
 # ============================================================
-# SIDEBAR
+# SIDEBAR — Claude style
 # ============================================================
 with st.sidebar:
-    st.markdown("### Account")
+    st.markdown("""
+    <div style="padding:8px 0 16px 0;">
+        <span style="font-size:1.4rem; font-weight:700; color:#fafafa;">⚡ ChargeGPT</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     if st.session_state.user_email is None:
-        email_input = st.text_input("Enter email to save chat history", placeholder="you@email.com")
+        st.markdown('<div style="font-size:0.82rem; color:#a1a1aa; margin-bottom:6px;">Sign in to save your chats</div>', unsafe_allow_html=True)
+        email_input = st.text_input("Email", placeholder="you@email.com", label_visibility="collapsed")
         if email_input and "@" in email_input:
             st.session_state.user_email = email_input.strip().lower()
             if st.session_state.user_email not in st.session_state.all_chats:
                 st.session_state.all_chats[st.session_state.user_email] = []
             st.rerun()
     else:
-        st.caption(f"Signed in: {st.session_state.user_email}")
-        if st.button("＋ New chat"):
+        if st.button("＋  New chat", key="newchat", use_container_width=True):
             new_chat()
             st.rerun()
 
-        # Chat history
         user_chats = st.session_state.all_chats.get(st.session_state.user_email, [])
         if user_chats:
-            with st.expander(f"Chat history ({len(user_chats)})"):
-                for i, chat in enumerate(reversed(user_chats)):
-                    real_index = len(user_chats) - 1 - i
-                    if st.button(f"{chat['title']}", key=f"hist_{real_index}"):
-                        load_chat(real_index)
-                        st.rerun()
+            st.markdown("""
+            <div style="font-size:0.7rem; color:#71717a; font-weight:600;
+            text-transform:uppercase; letter-spacing:1px; padding:14px 0 4px 0;">Recents</div>
+            """, unsafe_allow_html=True)
+            for i, chat in enumerate(reversed(user_chats)):
+                real_index = len(user_chats) - 1 - i
+                if st.button(chat["title"], key=f"hist_{real_index}", use_container_width=True):
+                    load_chat(real_index)
+                    st.rerun()
+
+        st.caption(f"Signed in: {st.session_state.user_email}")
 
     st.markdown("---")
-    st.markdown("### Mode")
+    st.markdown("""
+    <div style="font-size:0.7rem; color:#71717a; font-weight:600;
+    text-transform:uppercase; letter-spacing:1px; padding-bottom:4px;">Mode</div>
+    """, unsafe_allow_html=True)
     mode = st.selectbox(
         "Response mode",
         ["Full ChargeGPT", "LLM + RAG only", "LLM only (baseline)"],
         label_visibility="collapsed"
     )
-    if mode == "Full ChargeGPT":
-        st.caption("Analytics + RAG + LLM — most accurate")
-    elif mode == "LLM + RAG only":
-        st.caption("Knowledge base + LLM")
-    else:
-        st.caption("LLM only — no data grounding")
 
-    st.markdown("---")
-    st.markdown("### Data")
-    st.caption("29,775 charging sessions")
-    st.caption("124 driver survey responses")
-    st.caption("198 Newcastle stations")
-
-    st.markdown("---")
-    st.markdown("### Try")
-    st.caption('"Nearest charger to Primark"')
-    st.caption('"Nearest charger to NE4 6PL"')
-    st.caption('"When is charging busiest?"')
-    st.caption('"Where should stations be built?"')
+    st.markdown("""
+    <div style="font-size:0.72rem; color:#52525b; padding-top:12px; line-height:1.8;">
+    29,775 sessions · 124 drivers · 198 stations<br>
+    Newcastle University · v1.0
+    </div>
+    """, unsafe_allow_html=True)
 
 # ============================================================
 # CHAT AREA
@@ -531,10 +539,10 @@ if not st.session_state.messages:
     st.session_state.messages = [welcome_message()]
 
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
+    avatar = "⚡" if message["role"] == "assistant" else "👤"
+    with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
-# Follow-up buttons
 if len(st.session_state.messages) > 1:
     suggestions = FOLLOW_UPS.get(st.session_state.last_intent, FOLLOW_UPS["general"])
     cols = st.columns(len(suggestions))
@@ -544,7 +552,7 @@ if len(st.session_state.messages) > 1:
                 st.session_state.pending_question = s
                 st.rerun()
 
-user_input = st.chat_input("Ask about EV charging — try a postcode or place name...")
+user_input = st.chat_input("Ask about EV charging — postcode or place name works...")
 
 question_to_process = None
 if user_input:
@@ -554,11 +562,11 @@ elif st.session_state.pending_question:
     st.session_state.pending_question = None
 
 if question_to_process:
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar="👤"):
         st.markdown(question_to_process)
     st.session_state.messages.append({"role": "user", "content": question_to_process})
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar="⚡"):
         with st.spinner("Analysing..."):
             if mode == "Full ChargeGPT":
                 response, intent = answer(question_to_process)
@@ -575,11 +583,5 @@ if question_to_process:
             st.map(stations[["latitude", "longitude"]])
 
     st.session_state.messages.append({"role": "assistant", "content": response})
-
-    # Auto-save to history if signed in
-    if st.session_state.user_email:
-        email = st.session_state.user_email
-        if st.session_state.current_chat_index is not None:
-            st.session_state.all_chats[email][st.session_state.current_chat_index]["messages"] = st.session_state.messages
-
+    save_current_chat()
     st.rerun()
