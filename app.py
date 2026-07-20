@@ -559,7 +559,7 @@ if len(st.session_state.messages) > 1:
                 st.session_state.pending_question = s
                 st.rerun()
 
-user_input = st.chat_input("Ask about EV charging — postcode or place name works...")
+user_input = st.chat_input("Ask about EV charging in Newcastle")
 
 question_to_process = None
 if user_input:
@@ -592,3 +592,4 @@ if question_to_process:
     st.session_state.messages.append({"role": "assistant", "content": response})
     save_current_chat()
     st.rerun()
+    
